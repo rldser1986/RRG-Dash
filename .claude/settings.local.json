@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python src/main.py)",
+      "Bash(python3 -c \"import yfinance, pandas, numpy\")",
+      "Bash(pip3 install -r requirements.txt)",
+      "Bash(python3 -m venv .venv)",
+      "Bash(source .venv/bin/activate)",
+      "Bash(pip install -r requirements.txt)",
+      "Bash(.venv/bin/python src/main.py)",
+      "Bash(curl -s http://localhost:8501/_stcore/health)",
+      "Bash(\"/Users/rololagos/Library/Mobile Documents/com~apple~CloudDocs/Coding/RRG-Dash/.venv/bin/python\" -c \":*)",
+      "Bash(kill 73510)",
+      "Bash(.venv/bin/python -c \":*)",
+      "Bash(kill 73760)",
+      "Bash(python -c \":*)"
+    ]
+  }
+}
