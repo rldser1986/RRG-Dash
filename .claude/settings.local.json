@@ -14,7 +14,8 @@
       "Bash(.venv/bin/python -c \":*)",
       "Bash(kill 73760)",
       "Bash(python -c \":*)",
-      "Bash(pip freeze)"
+      "Bash(pip freeze)",
+      "Bash(pip install streamlit-autorefresh)"
     ]
   }
 }

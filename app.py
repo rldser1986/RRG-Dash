@@ -6,9 +6,12 @@ from datetime import datetime
 import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
+from streamlit_autorefresh import st_autorefresh
 
 from src.engine import run as engine_run
 from src.db import save_results, get_latest, get_by_date, get_tail, get_available_dates
+
+AUTOREFRESH_INTERVAL_MS = 60 * 60 * 1000  # 60 minutes
 
 # ---------------------------------------------------------------------------
 # Ticker definitions
@@ -77,12 +80,22 @@ compact_mode = st.sidebar.checkbox("Compact Mode", value=False)
 tail_weeks = st.sidebar.slider("Tail Length (weeks)", min_value=3, max_value=10, value=5)
 
 # ---------------------------------------------------------------------------
-# Refresh Data button
+# Refresh Data button + Auto-Refresh
 # ---------------------------------------------------------------------------
 st.sidebar.markdown("---")
 if st.sidebar.button("Refresh Data"):
     st.cache_data.clear()
+    st.session_state["last_refresh"] = datetime.now()
     st.rerun()
+
+auto_refresh = st.sidebar.toggle("Auto-Refresh (60 min)", value=False)
+
+if auto_refresh:
+    tick = st_autorefresh(interval=AUTOREFRESH_INTERVAL_MS, key="rrg_autorefresh")
+    # tick > 0 means an auto-refresh just fired (not the initial page load)
+    if tick > 0:
+        st.cache_data.clear()
+        st.session_state["last_refresh"] = datetime.now()
 
 if not tickers:
     st.warning("Enter at least one ticker to display.")
@@ -94,10 +107,20 @@ if not tickers:
 last_updated = fetch_and_store(tuple(sorted(tickers)), benchmark)
 
 # ---------------------------------------------------------------------------
-# Last Updated timestamp
+# Last Updated timestamp + countdown
 # ---------------------------------------------------------------------------
 st.sidebar.markdown("---")
-st.sidebar.caption(f"Last Updated: {last_updated}")
+# Persist the last refresh time in session state so it survives reruns
+if "last_refresh" not in st.session_state:
+    st.session_state["last_refresh"] = datetime.now()
+
+refresh_ts: datetime = st.session_state["last_refresh"]
+st.sidebar.caption(f"Last refreshed: {refresh_ts.strftime('%Y-%m-%d %H:%M:%S')}")
+
+if auto_refresh:
+    elapsed = datetime.now() - refresh_ts
+    remaining_min = max(0, 60 - int(elapsed.total_seconds() // 60))
+    st.sidebar.caption(f"Next refresh in: ~{remaining_min} min")
 
 # ---------------------------------------------------------------------------
 # Lookback slider
