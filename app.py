@@ -274,63 +274,51 @@ for _, row in snapshot.iterrows():
         velocity = 0.0
         toward = False
 
-    if compact_mode:
-        arrow = " \u2197" if toward else " \u2198"
-        velocity_rows.append({
-            "Ticker": ticker,
-            "RS-Ratio": row["rs_ratio"],
-            "RS-Momentum": row["rs_momentum"],
-            "Quadrant": row["quadrant"],
-            "Velocity": velocity,
-            "_toward": toward,
-            "_arrow": arrow,
-        })
-    else:
-        velocity_rows.append({
-            "Ticker": ticker,
-            "RS-Ratio": row["rs_ratio"],
-            "RS-Momentum": row["rs_momentum"],
-            "Quadrant": row["quadrant"],
-            "Velocity": velocity,
-            "Direction": "Toward Leading" if toward else "Away from Leading",
-            "_toward": toward,
-        })
+    velocity_rows.append({
+        "Ticker": ticker,
+        "RS-Ratio": round(row["rs_ratio"], 2),
+        "RS-Momentum": round(row["rs_momentum"], 2),
+        "Quadrant": row["quadrant"],
+        "Velocity": velocity,
+        "toward": toward,
+    })
 
 vtable = pd.DataFrame(velocity_rows)
 vtable = vtable.sort_values("Velocity", ascending=False).reset_index(drop=True)
 
+# Build the display DataFrame (no Styler — avoids serialization issues on
+# Streamlit Cloud).  Row highlighting is done with a leading emoji column.
+vtable_display = pd.DataFrame()
+vtable_display[""] = vtable["toward"].map({True: "\U0001f7e2", False: "\u26aa"})  # green circle / white circle
+vtable_display["Ticker"] = vtable["Ticker"]
+vtable_display["RS-Ratio"] = vtable["RS-Ratio"]
+vtable_display["RS-Momentum"] = vtable["RS-Momentum"]
+vtable_display["Quadrant"] = vtable["Quadrant"]
 
-def _highlight_direction(row):
-    """Green background for rows moving toward Leading."""
-    if row["_toward"]:
-        return ["background-color: rgba(0,200,83,0.15)"] * len(row)
-    return [""] * len(row)
-
-
-# Build display columns (hide internal fields)
 if compact_mode:
-    display_cols = ["Ticker", "RS-Ratio", "RS-Momentum", "Quadrant", "Velocity"]
-    format_dict = {"RS-Ratio": "{:.2f}", "RS-Momentum": "{:.2f}", "Velocity": "{:.3f}"}
-
-    # Merge arrow into Velocity as a formatted string column for display
-    vtable_display = vtable[display_cols].copy()
+    # Arrow emoji inside Velocity column; no separate Direction column
     vtable_display["Velocity"] = vtable.apply(
-        lambda r: f"{r['Velocity']:.3f}{r['_arrow']}", axis=1
-    )
-
-    styled = (
-        vtable_display.style
-        .format({"RS-Ratio": "{:.2f}", "RS-Momentum": "{:.2f}"})
-        .apply(lambda row: _highlight_direction(vtable.iloc[row.name]), axis=1)
+        lambda r: f"{r['Velocity']:.3f} \u2197" if r["toward"] else f"{r['Velocity']:.3f} \u2198",
+        axis=1,
     )
 else:
-    display_cols = ["Ticker", "RS-Ratio", "RS-Momentum", "Quadrant", "Velocity", "Direction"]
-    vtable_display = vtable[display_cols].copy()
-
-    styled = (
-        vtable_display.style
-        .format({"RS-Ratio": "{:.2f}", "RS-Momentum": "{:.2f}", "Velocity": "{:.3f}"})
-        .apply(lambda row: _highlight_direction(vtable.iloc[row.name]), axis=1)
+    vtable_display["Velocity"] = vtable["Velocity"].round(3)
+    vtable_display["Direction"] = vtable["toward"].map(
+        {True: "Toward Leading", False: "Away from Leading"}
     )
 
-st.dataframe(styled, use_container_width=True, hide_index=True)
+column_config = {
+    "": st.column_config.TextColumn("", width="small"),
+    "RS-Ratio": st.column_config.NumberColumn("RS-Ratio", format="%.2f"),
+    "RS-Momentum": st.column_config.NumberColumn("RS-Momentum", format="%.2f"),
+}
+
+if not compact_mode:
+    column_config["Velocity"] = st.column_config.NumberColumn("Velocity", format="%.3f")
+
+st.dataframe(
+    vtable_display,
+    use_container_width=True,
+    hide_index=True,
+    column_config=column_config,
+)

@@ -13,7 +13,8 @@
       "Bash(kill 73510)",
       "Bash(.venv/bin/python -c \":*)",
       "Bash(kill 73760)",
-      "Bash(python -c \":*)"
+      "Bash(python -c \":*)",
+      "Bash(pip freeze)"
     ]
   }
 }
