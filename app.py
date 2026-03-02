@@ -229,14 +229,22 @@ for _, row in snapshot.iterrows():
     tail = tails[ticker]
 
     if len(tail) > 1:
-        fig.add_trace(go.Scatter(
-            x=tail["rs_ratio"], y=tail["rs_momentum"],
-            mode="lines",
-            line=dict(color=color, width=1.5),
-            opacity=0.5,
-            showlegend=False,
-            hoverinfo="skip",
-        ))
+        n_segments = len(tail) - 1
+        for seg_i in range(n_segments):
+            # Ramp opacity from 0.15 (oldest segment) to 1.0 (newest)
+            if n_segments == 1:
+                seg_opacity = 1.0
+            else:
+                seg_opacity = 0.15 + 0.85 * (seg_i / (n_segments - 1))
+            fig.add_trace(go.Scatter(
+                x=tail["rs_ratio"].iloc[seg_i:seg_i + 2],
+                y=tail["rs_momentum"].iloc[seg_i:seg_i + 2],
+                mode="lines",
+                line=dict(color=color, width=1.5),
+                opacity=seg_opacity,
+                showlegend=False,
+                hoverinfo="skip",
+            ))
 
     marker_size = 8 if compact_mode else 10
     font_size = 10 if compact_mode else 11

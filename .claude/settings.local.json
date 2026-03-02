@@ -15,7 +15,11 @@
       "Bash(kill 73760)",
       "Bash(python -c \":*)",
       "Bash(pip freeze)",
-      "Bash(pip install streamlit-autorefresh)"
+      "Bash(pip install streamlit-autorefresh)",
+      "Bash(python3 -c \":*)",
+      "Bash(streamlit --version)",
+      "Bash(pip3 list)",
+      "Bash(conda list plotly)"
     ]
   }
 }
