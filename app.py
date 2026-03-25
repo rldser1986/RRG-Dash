@@ -11,6 +11,10 @@ from streamlit_autorefresh import st_autorefresh
 
 from src.engine import run as engine_run
 from src.db import save_results, get_latest, get_by_date, get_tail, get_available_dates
+from src.watchlists import (
+    get_supabase_client, list_watchlists, save_watchlist,
+    delete_watchlist, get_next_default_name,
+)
 
 AUTOREFRESH_INTERVAL_MS = 60 * 60 * 1000  # 60 minutes
 
@@ -142,6 +146,21 @@ else:  # Individual
     if pending and pending not in st.session_state["individual_tickers"]:
         st.session_state["individual_tickers"] = st.session_state["individual_tickers"] + [pending]
 
+    # Merge pending watchlist load (from Saved Watchlists button)
+    if "_pending_wl_tickers" in st.session_state:
+        _wl_syms = st.session_state.pop("_pending_wl_tickers")
+        _wl_bench = st.session_state.pop("_pending_wl_benchmark", "SPY")
+        if ticker_options:
+            _sym_to_opt = {opt.split(" — ")[0]: opt for opt in ticker_options}
+            st.session_state["individual_tickers"] = [
+                _sym_to_opt[s] for s in _wl_syms if s in _sym_to_opt
+            ]
+        else:
+            st.session_state["individual_tickers"] = _wl_syms
+        # Pre-set benchmark (before widget renders, so selectbox picks it up)
+        if _wl_bench in INDIVIDUAL_BENCHMARK_OPTIONS:
+            st.session_state["bench_individual"] = _wl_bench
+
     if ticker_options:
         selected = st.sidebar.multiselect(
             "Select stocks",
@@ -186,6 +205,75 @@ else:  # Individual
     if benchmark == "_SEP_":
         benchmark = "SPY"
     tickers = [t for t in tickers if t != benchmark]
+
+    # ── Section 1: Save Current Watchlist ─────────────────────────────────
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("**Save Current Watchlist**")
+    _default_wl_name = get_next_default_name()
+    wl_name = st.sidebar.text_input(
+        "Watchlist name", value=_default_wl_name, key="wl_name_input",
+    )
+    if st.sidebar.button("Save", use_container_width=True):
+        # Grab raw symbols from current multiselect state
+        _raw = [
+            s.split(" — ")[0]
+            for s in st.session_state.get("individual_tickers", [])
+        ]
+        if _raw:
+            result = save_watchlist(wl_name, _raw, benchmark)
+            if result:
+                st.sidebar.success("Saved!")
+                # Reset name input so next render gets an updated default
+                st.session_state.pop("wl_name_input", None)
+                st.rerun()
+            else:
+                st.sidebar.error("Save failed — check Supabase connection.")
+        else:
+            st.sidebar.warning("No tickers selected.")
+
+    # ── Section 2: Saved Watchlists ───────────────────────────────────────
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("**Saved Watchlists**")
+
+    if get_supabase_client() is None:
+        st.sidebar.info("Watchlist history unavailable")
+    else:
+        _watchlists = list_watchlists()
+        if not _watchlists:
+            st.sidebar.caption("No saved watchlists yet.")
+        else:
+            for _wl in _watchlists:
+                _wl_id = _wl["id"]
+                _wl_tickers = _wl["tickers"] if isinstance(_wl["tickers"], list) else []
+                _wl_label = f'{_wl["name"]} ({len(_wl_tickers)} stocks) vs {_wl["benchmark"]}'
+
+                _col_load, _col_del = st.sidebar.columns([5, 1])
+                with _col_load:
+                    if st.button(_wl_label, key=f"wl_load_{_wl_id}", use_container_width=True):
+                        st.session_state["_pending_wl_tickers"] = _wl_tickers
+                        st.session_state["_pending_wl_benchmark"] = _wl["benchmark"]
+                        st.rerun()
+                with _col_del:
+                    if st.button("\U0001f5d1\ufe0f", key=f"wl_del_{_wl_id}"):
+                        st.session_state["_confirm_delete_wl"] = _wl_id
+                        st.session_state["_confirm_delete_wl_name"] = _wl["name"]
+                        st.rerun()
+
+            # Delete confirmation dialog
+            if "_confirm_delete_wl" in st.session_state:
+                _del_name = st.session_state.get("_confirm_delete_wl_name", "")
+                st.sidebar.warning(f'Delete "{_del_name}"?')
+                _col_yes, _col_no = st.sidebar.columns(2)
+                with _col_yes:
+                    if st.button("Yes, delete", key="wl_del_yes", use_container_width=True):
+                        delete_watchlist(st.session_state.pop("_confirm_delete_wl"))
+                        st.session_state.pop("_confirm_delete_wl_name", None)
+                        st.rerun()
+                with _col_no:
+                    if st.button("Cancel", key="wl_del_no", use_container_width=True):
+                        st.session_state.pop("_confirm_delete_wl", None)
+                        st.session_state.pop("_confirm_delete_wl_name", None)
+                        st.rerun()
 
 # ---------------------------------------------------------------------------
 # Display options

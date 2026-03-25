@@ -4,3 +4,4 @@ numpy==2.4.2
 streamlit==1.54.0
 plotly==6.5.2
 streamlit-autorefresh==1.0.1
+supabase==2.28.3
