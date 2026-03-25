@@ -26,6 +26,17 @@ SECTORS = {
 }
 
 BENCHMARK_OPTIONS = ["SPY", "QQQ", "IWM", "RSP", "VTV", "VUG", "DIA", "EFA", "EEM"]
+BENCHMARK_LABELS = {
+    "SPY": "SPY — S&P 500",
+    "QQQ": "QQQ — Nasdaq 100",
+    "IWM": "IWM — Russell 2000",
+    "RSP": "RSP — Equal-Weight S&P",
+    "VTV": "VTV — Value",
+    "VUG": "VUG — Growth",
+    "DIA": "DIA — Dow 30",
+    "EFA": "EFA — Intl Developed",
+    "EEM": "EEM — Emerging Markets",
+}
 
 QUADRANT_COLORS = {
     "Leading": "#00C853",
@@ -63,14 +74,14 @@ if view == "Indices":
     tickers = [t for t in INDICES if t != benchmark]
     st.sidebar.caption(f"Benchmark: {benchmark}")
 elif view == "Sectors":
-    benchmark = st.sidebar.selectbox("Benchmark", BENCHMARK_OPTIONS, key="bench_sectors")
+    benchmark = st.sidebar.selectbox("Benchmark", BENCHMARK_OPTIONS, format_func=lambda t: BENCHMARK_LABELS[t], key="bench_sectors")
     tickers = list(SECTORS.keys())
     tickers = [t for t in tickers if t != benchmark]
 else:  # Individual
     custom_input = st.sidebar.text_input(
         "Tickers (comma-separated)", value="AAPL, NVDA, MSFT, GOOGL"
     )
-    benchmark = st.sidebar.selectbox("Benchmark", BENCHMARK_OPTIONS, key="bench_individual")
+    benchmark = st.sidebar.selectbox("Benchmark", BENCHMARK_OPTIONS, format_func=lambda t: BENCHMARK_LABELS[t], key="bench_individual")
     tickers = [t.strip().upper() for t in custom_input.split(",") if t.strip()]
     tickers = [t for t in tickers if t != benchmark]
 
