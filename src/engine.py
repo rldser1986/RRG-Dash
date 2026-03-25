@@ -13,12 +13,20 @@ FETCH_YEARS = 2
 
 
 def fetch_prices(tickers: list[str], benchmark: str = "SPY") -> pd.DataFrame:
-    """Fetch weekly Adj Close prices for tickers + benchmark via yfinance."""
+    """Fetch daily Close prices and resample into rolling 5-day (synthetic weekly) candles.
+
+    Instead of relying on calendar-week candles from yfinance (which only
+    complete on Fridays), we fetch daily data and take every 5th trading day
+    as a synthetic weekly close.  This means the most recent "week" always
+    ends on the latest trading day, so the RRG updates daily rather than
+    once per calendar week.
+    """
     all_symbols = list(set([benchmark] + tickers))
     end = datetime.today()
-    start = end - timedelta(weeks=FETCH_YEARS * 52 + RS_WINDOW + MOMENTUM_WINDOW)
+    # Fetch enough daily data: ~5 trading days per week × (years + lookback buffer)
+    start = end - timedelta(weeks=FETCH_YEARS * 52 + RS_WINDOW + MOMENTUM_WINDOW + 4)
 
-    data = yf.download(all_symbols, start=start, end=end, interval="1wk", auto_adjust=True)
+    data = yf.download(all_symbols, start=start, end=end, interval="1d", auto_adjust=True)
 
     if data.empty:
         raise ValueError("yfinance returned no data")
@@ -30,6 +38,11 @@ def fetch_prices(tickers: list[str], benchmark: str = "SPY") -> pd.DataFrame:
         prices = data[["Close"]].rename(columns={"Close": all_symbols[0]})
 
     prices = prices.dropna(how="all")
+
+    # Resample: take every 5th trading day (anchored to the most recent day)
+    # by reversing, slicing every 5th row, and reversing back.
+    prices = prices.iloc[::-5][::-1]
+
     return prices
 
 
