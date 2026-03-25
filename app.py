@@ -1,6 +1,7 @@
 """RRG Dashboard — Streamlit entry point."""
 
 import math
+import os
 from datetime import datetime
 
 import streamlit as st
@@ -80,6 +81,18 @@ def fetch_and_store(tickers: tuple, benchmark: str) -> str:
         save_results(df)
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+
+SP500_CSV = os.path.join(os.path.dirname(__file__), "data", "sp500_tickers.csv")
+
+
+@st.cache_data
+def load_ticker_options() -> list[str]:
+    """Load sp500_tickers.csv and return formatted options: 'TICKER — Company'."""
+    if not os.path.exists(SP500_CSV):
+        return []
+    df = pd.read_csv(SP500_CSV, usecols=["Symbol", "Company"])
+    return [f"{row.Symbol} — {row.Company}" for _, row in df.iterrows()]
+
 # ---------------------------------------------------------------------------
 # Sidebar
 # ---------------------------------------------------------------------------
@@ -96,13 +109,39 @@ elif view == "Sectors":
     tickers = list(SECTORS.keys())
     tickers = [t for t in tickers if t != benchmark]
 else:  # Individual
-    custom_input = st.sidebar.text_input(
-        "Tickers (comma-separated)", value="AAPL, NVDA, MSFT, GOOGL"
-    )
+    ticker_options = load_ticker_options()
+    default_selections = [
+        "AAPL — Apple Inc.",
+        "MSFT — Microsoft",
+        "GOOGL — Alphabet Inc. (Class A)",
+        "NVDA — Nvidia",
+    ]
+    # Support URL query params: ?tickers=AAPL,MSFT,NVDA
+    url_tickers = st.query_params.get("tickers", "")
+    if url_tickers and ticker_options:
+        url_syms = [s.strip().upper() for s in url_tickers.split(",") if s.strip()]
+        # Map raw symbols to their formatted option strings
+        sym_to_opt = {opt.split(" — ")[0]: opt for opt in ticker_options}
+        default_selections = [sym_to_opt[s] for s in url_syms if s in sym_to_opt]
+
+    if ticker_options:
+        selected = st.sidebar.multiselect(
+            "Select stocks",
+            options=ticker_options,
+            default=default_selections,
+            help="Type to search by ticker or company name",
+        )
+        tickers = [s.split(" — ")[0] for s in selected]
+    else:
+        # Fallback if CSV not generated yet
+        custom_input = st.sidebar.text_input(
+            "Tickers (comma-separated)", value="AAPL, NVDA, MSFT, GOOGL"
+        )
+        tickers = [t.strip().upper() for t in custom_input.split(",") if t.strip()]
+
     benchmark = st.sidebar.selectbox("Benchmark", INDIVIDUAL_BENCHMARK_OPTIONS, format_func=lambda t: BENCHMARK_LABELS[t], key="bench_individual")
     if benchmark == "_SEP_":
         benchmark = "SPY"
-    tickers = [t.strip().upper() for t in custom_input.split(",") if t.strip()]
     tickers = [t for t in tickers if t != benchmark]
 
 # ---------------------------------------------------------------------------
