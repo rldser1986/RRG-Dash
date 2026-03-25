@@ -77,7 +77,7 @@ else:  # Individual
 # ---------------------------------------------------------------------------
 st.sidebar.markdown("---")
 compact_mode = st.sidebar.checkbox("Compact Mode", value=False)
-tail_weeks = st.sidebar.slider("Tail Length (weeks)", min_value=3, max_value=10, value=5)
+tail_weeks = st.sidebar.slider("Tail Length (weeks)", min_value=3, max_value=10, value=3)
 
 # ---------------------------------------------------------------------------
 # Refresh Data button + Auto-Refresh
