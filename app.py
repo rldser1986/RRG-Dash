@@ -162,23 +162,14 @@ if snapshot.empty:
 # ---------------------------------------------------------------------------
 # Global CSS overrides
 # ---------------------------------------------------------------------------
-_css_parts = []
-
-# Make the lookback slider track uniform grey (no blue fill on left side)
-_css_parts.append("""
-[data-testid="stSlider"] [data-testid="stThumbValue"] { font-size: 0.85rem; }
-[data-testid="stSlider"] [role="slider"] ~ div[data-testid] {
-    background: transparent !important;
-}
-""")
-
 if compact_mode:
-    _css_parts.append("""
-.block-container { padding-top: 1rem; }
-.stDataFrame td, .stDataFrame th { font-size: 1.05rem !important; }
-""")
-
-st.markdown(f"<style>{''.join(_css_parts)}</style>", unsafe_allow_html=True)
+    st.markdown(
+        "<style>"
+        "  .block-container { padding-top: 1rem; }"
+        "  .stDataFrame td, .stDataFrame th { font-size: 1.05rem !important; }"
+        "</style>",
+        unsafe_allow_html=True,
+    )
 
 # ---------------------------------------------------------------------------
 # Precompute tails (used by both chart and velocity table)
