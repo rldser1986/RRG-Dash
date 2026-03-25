@@ -81,15 +81,28 @@ def get_by_date(date: str, benchmark: str = "SPY") -> pd.DataFrame:
     return df
 
 
-def get_tail(ticker: str, benchmark: str = "SPY", n_weeks: int = 5) -> pd.DataFrame:
-    """Return the last N weeks of data for a ticker (for drawing tails)."""
+def get_tail(ticker: str, benchmark: str = "SPY", n_weeks: int = 5,
+             up_to_date: str | None = None) -> pd.DataFrame:
+    """Return the last N weeks of data for a ticker (for drawing tails).
+
+    If *up_to_date* is given, only rows on or before that date are considered
+    (used in lookback mode so the tail ends at the selected date).
+    """
     conn = _get_conn()
-    df = pd.read_sql_query("""
-        SELECT * FROM rrg_data
-        WHERE ticker = ? AND benchmark = ?
-        ORDER BY date DESC
-        LIMIT ?
-    """, conn, params=(ticker, benchmark, n_weeks))
+    if up_to_date:
+        df = pd.read_sql_query("""
+            SELECT * FROM rrg_data
+            WHERE ticker = ? AND benchmark = ? AND date <= ?
+            ORDER BY date DESC
+            LIMIT ?
+        """, conn, params=(ticker, benchmark, up_to_date, n_weeks))
+    else:
+        df = pd.read_sql_query("""
+            SELECT * FROM rrg_data
+            WHERE ticker = ? AND benchmark = ?
+            ORDER BY date DESC
+            LIMIT ?
+        """, conn, params=(ticker, benchmark, n_weeks))
     conn.close()
     return df.sort_values("date").reset_index(drop=True)
 

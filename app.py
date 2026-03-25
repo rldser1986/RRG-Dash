@@ -122,7 +122,7 @@ if "last_refresh" not in st.session_state:
     st.session_state["last_refresh"] = datetime.now()
 
 refresh_ts: datetime = st.session_state["last_refresh"]
-st.sidebar.caption(f"Last refreshed: {refresh_ts.strftime('%Y-%m-%d %H:%M:%S')}")
+st.sidebar.caption(f"Last refreshed: {refresh_ts.strftime('%Y-%m-%d %H:%M:%S')} UTC")
 
 if auto_refresh:
     elapsed = datetime.now() - refresh_ts
@@ -160,23 +160,35 @@ if snapshot.empty:
     st.stop()
 
 # ---------------------------------------------------------------------------
-# Compact mode CSS
+# Global CSS overrides
 # ---------------------------------------------------------------------------
+_css_parts = []
+
+# Make the lookback slider track uniform grey (no blue fill on left side)
+_css_parts.append("""
+[data-testid="stSlider"] [data-testid="stThumbValue"] { font-size: 0.85rem; }
+[data-testid="stSlider"] [role="slider"] ~ div[data-testid] {
+    background: transparent !important;
+}
+""")
+
 if compact_mode:
-    st.markdown(
-        "<style>"
-        "  .block-container { padding-top: 1rem; }"
-        "  .stDataFrame td, .stDataFrame th { font-size: 1.05rem !important; }"
-        "</style>",
-        unsafe_allow_html=True,
-    )
+    _css_parts.append("""
+.block-container { padding-top: 1rem; }
+.stDataFrame td, .stDataFrame th { font-size: 1.05rem !important; }
+""")
+
+st.markdown(f"<style>{''.join(_css_parts)}</style>", unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
 # Precompute tails (used by both chart and velocity table)
 # ---------------------------------------------------------------------------
 tails: dict[str, pd.DataFrame] = {}
+# In lookback mode, tails must end at the selected date (not the latest)
+_tail_cutoff = selected_date if use_lookback else None
 for _, row in snapshot.iterrows():
-    tails[row["ticker"]] = get_tail(row["ticker"], benchmark, tail_weeks)
+    tails[row["ticker"]] = get_tail(row["ticker"], benchmark, tail_weeks,
+                                     up_to_date=_tail_cutoff)
 
 # ---------------------------------------------------------------------------
 # Hero Plot
