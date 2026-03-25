@@ -25,6 +25,8 @@ SECTORS = {
     "XLV": "Health Care", "XLY": "Consumer Discretionary",
 }
 
+BENCHMARK_OPTIONS = ["SPY", "QQQ", "IWM", "RSP", "VTV", "VUG", "DIA", "EFA", "EEM"]
+
 QUADRANT_COLORS = {
     "Leading": "#00C853",
     "Weakening": "#FF9100",
@@ -61,14 +63,14 @@ if view == "Indices":
     tickers = [t for t in INDICES if t != benchmark]
     st.sidebar.caption(f"Benchmark: {benchmark}")
 elif view == "Sectors":
-    benchmark = "SPY"
+    benchmark = st.sidebar.selectbox("Benchmark", BENCHMARK_OPTIONS, key="bench_sectors")
     tickers = list(SECTORS.keys())
-    st.sidebar.caption(f"Benchmark: {benchmark}")
+    tickers = [t for t in tickers if t != benchmark]
 else:  # Individual
     custom_input = st.sidebar.text_input(
         "Tickers (comma-separated)", value="AAPL, NVDA, MSFT, GOOGL"
     )
-    benchmark = st.sidebar.selectbox("Benchmark", ["SPY"] + list(SECTORS.keys()))
+    benchmark = st.sidebar.selectbox("Benchmark", BENCHMARK_OPTIONS, key="bench_individual")
     tickers = [t.strip().upper() for t in custom_input.split(",") if t.strip()]
     tickers = [t for t in tickers if t != benchmark]
 
