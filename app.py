@@ -238,28 +238,18 @@ for _, row in snapshot.iterrows():
     tail = tails[ticker]
 
     if len(tail) > 1:
-        # Full smooth spline at low opacity (background curve)
-        fig.add_trace(go.Scatter(
-            x=tail["rs_ratio"], y=tail["rs_momentum"],
-            mode="lines",
-            line=dict(color=color, width=1, shape="spline", smoothing=1.0),
-            opacity=0.2,
-            showlegend=False,
-            hoverinfo="skip",
-        ))
-        # Overlay progressively more opaque + thicker segments on recent end
         n_segments = len(tail) - 1
         for seg_i in range(n_segments):
+            # Ramp opacity from 0.15 (oldest segment) to 1.0 (newest)
             if n_segments == 1:
                 seg_opacity = 1.0
             else:
                 seg_opacity = 0.15 + 0.85 * (seg_i / (n_segments - 1))
-            seg_width = 1.0 + 1.5 * (seg_i / max(n_segments - 1, 1))
             fig.add_trace(go.Scatter(
                 x=tail["rs_ratio"].iloc[seg_i:seg_i + 2],
                 y=tail["rs_momentum"].iloc[seg_i:seg_i + 2],
                 mode="lines",
-                line=dict(color=color, width=seg_width),
+                line=dict(color=color, width=1.5),
                 opacity=seg_opacity,
                 showlegend=False,
                 hoverinfo="skip",
