@@ -142,15 +142,14 @@ if not available_dates:
 use_lookback = st.sidebar.checkbox("Lookback mode", value=False)
 
 if use_lookback and len(available_dates) > 1:
-    date_idx = st.sidebar.slider(
-        "Date", 0, len(available_dates) - 1, len(available_dates) - 1,
-        format=f"Week %d of {len(available_dates)}"
+    selected_date = st.sidebar.select_slider(
+        "Date",
+        options=available_dates,
+        value=available_dates[-1],
     )
-    selected_date = available_dates[date_idx]
     snapshot = get_by_date(selected_date, benchmark)
     # Filter to current tickers only
     snapshot = snapshot[snapshot["ticker"].isin(tickers)]
-    st.sidebar.caption(f"Showing: {selected_date}")
 else:
     selected_date = available_dates[-1]
     snapshot = get_latest(benchmark)
