@@ -83,9 +83,16 @@ tail_weeks = st.sidebar.slider("Tail Length (weeks)", min_value=3, max_value=10,
 # Refresh Data button + Auto-Refresh
 # ---------------------------------------------------------------------------
 st.sidebar.markdown("---")
+
+# Show toast confirmation from previous rerun (flag set before st.rerun)
+if st.session_state.get("_show_refresh_toast"):
+    st.toast("Data refreshed!", icon="\u2705")
+    st.session_state["_show_refresh_toast"] = False
+
 if st.sidebar.button("Refresh Data"):
     st.cache_data.clear()
     st.session_state["last_refresh"] = datetime.now()
+    st.session_state["_show_refresh_toast"] = True
     st.rerun()
 
 auto_refresh = st.sidebar.toggle("Auto-Refresh (60 min)", value=False)
