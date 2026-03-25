@@ -238,20 +238,19 @@ for _, row in snapshot.iterrows():
     tail = tails[ticker]
 
     if len(tail) > 1:
-        n_pts = len(tail)
-        # Draw overlapping spline traces of decreasing length, all ending
-        # at the most recent point.  Each layer adds opacity, so the recent
-        # end (where all layers overlap) is bright and the old end is faint.
-        n_layers = n_pts - 1          # one layer per possible start offset
-        layer_opacity = 0.8 / n_layers  # cumulative ≈ 0.8 at the newest end
-        for start in range(n_layers):
-            seg = tail.iloc[start:]
+        n_segments = len(tail) - 1
+        for seg_i in range(n_segments):
+            # Ramp opacity from 0.15 (oldest segment) to 1.0 (newest)
+            if n_segments == 1:
+                seg_opacity = 1.0
+            else:
+                seg_opacity = 0.15 + 0.85 * (seg_i / (n_segments - 1))
             fig.add_trace(go.Scatter(
-                x=seg["rs_ratio"], y=seg["rs_momentum"],
+                x=tail["rs_ratio"].iloc[seg_i:seg_i + 2],
+                y=tail["rs_momentum"].iloc[seg_i:seg_i + 2],
                 mode="lines",
-                line=dict(color=color, width=1.5,
-                          shape="spline", smoothing=1.0),
-                opacity=layer_opacity,
+                line=dict(color=color, width=1.5),
+                opacity=seg_opacity,
                 showlegend=False,
                 hoverinfo="skip",
             ))
