@@ -2,3 +2,8 @@ data/*.db
 __pycache__/
 *.pyc
 .env
+.streamlit/secrets.toml
+.DS_Store
+src/.DS_Store
+RRG-Cowork-Implementation-Guide.md
+RRG-Dashboard-Development-Log.md
