@@ -36,7 +36,25 @@ BENCHMARK_LABELS = {
     "DIA": "DIA — Dow 30",
     "EFA": "EFA — Intl Developed",
     "EEM": "EEM — Emerging Markets",
+    # Sector ETFs (Individual view only)
+    "XLK": "XLK — Technology",
+    "XLV": "XLV — Health Care",
+    "XLF": "XLF — Financials",
+    "XLE": "XLE — Energy",
+    "XLI": "XLI — Industrials",
+    "XLY": "XLY — Consumer Disc.",
+    "XLP": "XLP — Consumer Staples",
+    "XLU": "XLU — Utilities",
+    "XLC": "XLC — Communication",
+    "XLRE": "XLRE — Real Estate",
+    "XLB": "XLB — Materials",
+    "_SEP_": "── Sector ETFs ──",
 }
+INDIVIDUAL_BENCHMARK_OPTIONS = (
+    BENCHMARK_OPTIONS
+    + ["_SEP_"]
+    + ["XLK", "XLV", "XLF", "XLE", "XLI", "XLY", "XLP", "XLU", "XLC", "XLRE", "XLB"]
+)
 
 QUADRANT_COLORS = {
     "Leading": "#00C853",
@@ -81,7 +99,9 @@ else:  # Individual
     custom_input = st.sidebar.text_input(
         "Tickers (comma-separated)", value="AAPL, NVDA, MSFT, GOOGL"
     )
-    benchmark = st.sidebar.selectbox("Benchmark", BENCHMARK_OPTIONS, format_func=lambda t: BENCHMARK_LABELS[t], key="bench_individual")
+    benchmark = st.sidebar.selectbox("Benchmark", INDIVIDUAL_BENCHMARK_OPTIONS, format_func=lambda t: BENCHMARK_LABELS[t], key="bench_individual")
+    if benchmark == "_SEP_":
+        benchmark = "SPY"
     tickers = [t.strip().upper() for t in custom_input.split(",") if t.strip()]
     tickers = [t for t in tickers if t != benchmark]
 
