@@ -137,6 +137,11 @@ else:  # Individual
     if "individual_tickers" not in st.session_state:
         st.session_state["individual_tickers"] = default_selections
 
+    # Merge any pending addition from "Add to watchlist" button
+    pending = st.session_state.pop("_pending_ticker", None)
+    if pending and pending not in st.session_state["individual_tickers"]:
+        st.session_state["individual_tickers"] = st.session_state["individual_tickers"] + [pending]
+
     if ticker_options:
         selected = st.sidebar.multiselect(
             "Select stocks",
@@ -173,9 +178,8 @@ else:  # Individual
             sel_stock = st.selectbox("Stock", stock_opts, key="browse_stock")
 
             if st.button("Add to watchlist"):
-                current = st.session_state.get("individual_tickers", [])
-                if sel_stock and sel_stock not in current:
-                    st.session_state["individual_tickers"] = current + [sel_stock]
+                if sel_stock:
+                    st.session_state["_pending_ticker"] = sel_stock
                     st.rerun()
 
     benchmark = st.sidebar.selectbox("Benchmark", INDIVIDUAL_BENCHMARK_OPTIONS, format_func=lambda t: BENCHMARK_LABELS[t], key="bench_individual")
