@@ -86,11 +86,19 @@ SP500_CSV = os.path.join(os.path.dirname(__file__), "data", "sp500_tickers.csv")
 
 
 @st.cache_data
-def load_ticker_options() -> list[str]:
-    """Load sp500_tickers.csv and return formatted options: 'TICKER — Company'."""
+def load_ticker_csv() -> pd.DataFrame:
+    """Load sp500_tickers.csv into a DataFrame. Returns empty DF if missing."""
     if not os.path.exists(SP500_CSV):
+        return pd.DataFrame()
+    return pd.read_csv(SP500_CSV)
+
+
+@st.cache_data
+def load_ticker_options() -> list[str]:
+    """Return formatted options: 'TICKER — Company'."""
+    df = load_ticker_csv()
+    if df.empty:
         return []
-    df = pd.read_csv(SP500_CSV, usecols=["Symbol", "Company"])
     return [f"{row.Symbol} — {row.Company}" for _, row in df.iterrows()]
 
 # ---------------------------------------------------------------------------
@@ -110,6 +118,8 @@ elif view == "Sectors":
     tickers = [t for t in tickers if t != benchmark]
 else:  # Individual
     ticker_options = load_ticker_options()
+    ticker_csv = load_ticker_csv()
+
     default_selections = [
         "AAPL — Apple Inc.",
         "MSFT — Microsoft",
@@ -120,15 +130,18 @@ else:  # Individual
     url_tickers = st.query_params.get("tickers", "")
     if url_tickers and ticker_options:
         url_syms = [s.strip().upper() for s in url_tickers.split(",") if s.strip()]
-        # Map raw symbols to their formatted option strings
         sym_to_opt = {opt.split(" — ")[0]: opt for opt in ticker_options}
         default_selections = [sym_to_opt[s] for s in url_syms if s in sym_to_opt]
+
+    # Initialise session_state for multiselect (allows button injection)
+    if "individual_tickers" not in st.session_state:
+        st.session_state["individual_tickers"] = default_selections
 
     if ticker_options:
         selected = st.sidebar.multiselect(
             "Select stocks",
             options=ticker_options,
-            default=default_selections,
+            key="individual_tickers",
             help="Type to search by ticker or company name",
         )
         tickers = [s.split(" — ")[0] for s in selected]
@@ -138,6 +151,32 @@ else:  # Individual
             "Tickers (comma-separated)", value="AAPL, NVDA, MSFT, GOOGL"
         )
         tickers = [t.strip().upper() for t in custom_input.split(",") if t.strip()]
+
+    # --- Browse by Sector expander ---
+    if not ticker_csv.empty:
+        # Exclude benchmarks from sector browsing
+        stock_df = ticker_csv[ticker_csv["GICS Sector"] != "Benchmark"].copy()
+        sectors_list = sorted(stock_df["GICS Sector"].dropna().unique().tolist())
+
+        with st.sidebar.expander("Browse by Sector"):
+            sel_sector = st.selectbox("Sector", sectors_list, key="browse_sector")
+            industries_in_sector = sorted(
+                stock_df.loc[stock_df["GICS Sector"] == sel_sector, "GICS Sub-Industry"]
+                .dropna().unique().tolist()
+            )
+            sel_industry = st.selectbox("Industry", industries_in_sector, key="browse_industry")
+            stocks_in_industry = stock_df[stock_df["GICS Sub-Industry"] == sel_industry]
+            stock_opts = [
+                f"{r.Symbol} — {r.Company}"
+                for _, r in stocks_in_industry.iterrows()
+            ]
+            sel_stock = st.selectbox("Stock", stock_opts, key="browse_stock")
+
+            if st.button("Add to watchlist"):
+                current = st.session_state.get("individual_tickers", [])
+                if sel_stock and sel_stock not in current:
+                    st.session_state["individual_tickers"] = current + [sel_stock]
+                    st.rerun()
 
     benchmark = st.sidebar.selectbox("Benchmark", INDIVIDUAL_BENCHMARK_OPTIONS, format_func=lambda t: BENCHMARK_LABELS[t], key="bench_individual")
     if benchmark == "_SEP_":
