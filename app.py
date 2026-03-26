@@ -15,7 +15,7 @@ from src.watchlists import (
     delete_watchlist, get_next_default_name,
 )
 from src.ticker_registry import (
-    get_ticker_options, get_ticker_df, validate_symbols, validate_and_register,
+    get_ticker_options, get_ticker_df, validate_symbols,
 )
 
 AUTOREFRESH_INTERVAL_MS = 60 * 60 * 1000  # 60 minutes
