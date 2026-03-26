@@ -110,6 +110,37 @@ def load_ticker_options() -> list[str]:
     """Return formatted options: 'TICKER — Company'."""
     return get_ticker_options()
 
+
+def _resolve_symbols(
+    syms: list[str], ticker_options: list[str],
+) -> tuple[list[str], list[str]]:
+    """Resolve raw symbols into multiselect-formatted options.
+
+    Returns (known_options, possibly_reloaded_ticker_options).
+    Validates unknown symbols via yfinance, stores invalid ones in
+    st.session_state["_invalid_tickers"], and reloads ticker_options
+    if any new tickers were registered.
+    """
+    if not ticker_options:
+        return syms, ticker_options
+
+    sym_to_opt = {opt.split(" — ")[0]: opt for opt in ticker_options}
+    known = [sym_to_opt[s] for s in syms if s in sym_to_opt]
+    unknown = [s for s in syms if s not in sym_to_opt]
+
+    if unknown:
+        with st.spinner("Validating new tickers…"):
+            valid, invalid = validate_symbols(unknown)
+        if invalid:
+            st.session_state["_invalid_tickers"] = invalid
+        if valid:
+            ticker_options = load_ticker_options()
+            sym_to_opt = {opt.split(" — ")[0]: opt for opt in ticker_options}
+            known += [sym_to_opt[s] for s in valid if s in sym_to_opt]
+
+    return known, ticker_options
+
+
 # ---------------------------------------------------------------------------
 # Sidebar
 # ---------------------------------------------------------------------------
@@ -155,22 +186,8 @@ else:  # Individual
     if "_pending_wl_tickers" in st.session_state:
         _wl_syms = st.session_state.pop("_pending_wl_tickers")
         _wl_bench = st.session_state.pop("_pending_wl_benchmark", "SPY")
-        if ticker_options:
-            _sym_to_opt = {opt.split(" — ")[0]: opt for opt in ticker_options}
-            _known = [_sym_to_opt[s] for s in _wl_syms if s in _sym_to_opt]
-            _unknown = [s for s in _wl_syms if s not in _sym_to_opt]
-            if _unknown:
-                with st.spinner("Validating new tickers…"):
-                    _valid, _invalid = validate_symbols(_unknown)
-                if _invalid:
-                    st.session_state["_invalid_tickers"] = _invalid
-                if _valid:
-                    ticker_options = load_ticker_options()
-                    _sym_to_opt = {opt.split(" — ")[0]: opt for opt in ticker_options}
-                    _known += [_sym_to_opt[s] for s in _valid if s in _sym_to_opt]
-            st.session_state["individual_tickers"] = _known
-        else:
-            st.session_state["individual_tickers"] = _wl_syms
+        _known, ticker_options = _resolve_symbols(_wl_syms, ticker_options)
+        st.session_state["individual_tickers"] = _known
         # Pre-set benchmark (before widget renders, so selectbox picks it up)
         if _wl_bench in INDIVIDUAL_BENCHMARK_OPTIONS:
             st.session_state["bench_individual"] = _wl_bench
@@ -178,24 +195,8 @@ else:  # Individual
     # Merge pending preset load (from Quick Picks buttons)
     if "_pending_preset" in st.session_state:
         _preset_syms = st.session_state.pop("_pending_preset")
-        if ticker_options:
-            _sym_to_opt = {opt.split(" — ")[0]: opt for opt in ticker_options}
-            _known = [_sym_to_opt[s] for s in _preset_syms if s in _sym_to_opt]
-            _unknown = [s for s in _preset_syms if s not in _sym_to_opt]
-            # Validate & register unknown tickers via yfinance
-            if _unknown:
-                with st.spinner("Validating new tickers…"):
-                    _valid, _invalid = validate_symbols(_unknown)
-                if _invalid:
-                    st.session_state["_invalid_tickers"] = _invalid
-                # Reload options now that new tickers were registered
-                if _valid:
-                    ticker_options = load_ticker_options()
-                    _sym_to_opt = {opt.split(" — ")[0]: opt for opt in ticker_options}
-                    _known += [_sym_to_opt[s] for s in _valid if s in _sym_to_opt]
-            st.session_state["individual_tickers"] = _known
-        else:
-            st.session_state["individual_tickers"] = _preset_syms
+        _known, ticker_options = _resolve_symbols(_preset_syms, ticker_options)
+        st.session_state["individual_tickers"] = _known
 
     # ── Quick Picks (preset watchlists) ───────────────────────────────────
     st.sidebar.caption("Quick picks")
