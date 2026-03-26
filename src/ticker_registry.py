@@ -44,7 +44,7 @@ def _get_service_client():
         url = st.secrets["supabase"]["url"]
         key = st.secrets["supabase"].get("service_key", "")
         if not key:
-            # Fall back to anon client if no service key configured
+            logger.warning("service_key not configured — ticker writes will use anon client (may fail under RLS)")
             return _get_client()
         return create_client(url, key)
     except Exception as exc:
