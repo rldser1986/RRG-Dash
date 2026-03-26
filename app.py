@@ -101,16 +101,6 @@ def fetch_and_store(tickers: tuple, benchmark: str) -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-def load_ticker_csv() -> pd.DataFrame:
-    """Load ticker data from Supabase registry (with CSV fallback)."""
-    return get_ticker_df()
-
-
-def load_ticker_options() -> list[str]:
-    """Return formatted options: 'TICKER — Company'."""
-    return get_ticker_options()
-
-
 def _resolve_symbols(
     syms: list[str], ticker_options: list[str],
 ) -> tuple[list[str], list[str]]:
@@ -134,7 +124,7 @@ def _resolve_symbols(
         if invalid:
             st.session_state["_invalid_tickers"] = invalid
         if valid:
-            ticker_options = load_ticker_options()
+            ticker_options = get_ticker_options()
             sym_to_opt = {opt.split(" — ")[0]: opt for opt in ticker_options}
             known += [sym_to_opt[s] for s in valid if s in sym_to_opt]
 
@@ -157,8 +147,8 @@ elif view == "Sectors":
     tickers = list(SECTORS.keys())
     tickers = [t for t in tickers if t != benchmark]
 else:  # Individual
-    ticker_options = load_ticker_options()
-    ticker_csv = load_ticker_csv()
+    ticker_options = get_ticker_options()
+    ticker_csv = get_ticker_df()
 
     default_selections = [
         "AAPL — Apple Inc.",
