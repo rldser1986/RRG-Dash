@@ -419,6 +419,17 @@ for _, row in snapshot.iterrows():
                                      up_to_date=_tail_cutoff)
 
 # ---------------------------------------------------------------------------
+# Quadrant Summary Cards
+# ---------------------------------------------------------------------------
+_quad_emoji = {"Leading": "🟢", "Weakening": "🟡", "Lagging": "🔴", "Improving": "🔵"}
+_quad_counts = snapshot["quadrant"].value_counts().to_dict()
+_card_cols = st.columns(4)
+for _i, (_q_name, _q_emoji) in enumerate(_quad_emoji.items()):
+    with _card_cols[_i]:
+        _count = _quad_counts.get(_q_name, 0)
+        st.metric(label=f"{_q_emoji} {_q_name}", value=_count)
+
+# ---------------------------------------------------------------------------
 # Hero Plot
 # ---------------------------------------------------------------------------
 if compact_mode:
@@ -433,7 +444,10 @@ else:
 
 fig = go.Figure()
 
-# Determine axis range from data (with padding)
+# Determine axis range — fixed default 96-104, expand symmetrically for outliers
+# and keep quadrants square (equal x and y span).
+FIXED_LO, FIXED_HI = 96.0, 104.0
+
 all_ratios = snapshot["rs_ratio"].tolist()
 all_momenta = snapshot["rs_momentum"].tolist()
 for tail in tails.values():
@@ -441,10 +455,27 @@ for tail in tails.values():
     all_momenta.extend(tail["rs_momentum"].tolist())
 
 pad = 0.5
-x_min = min(all_ratios) - pad
-x_max = max(all_ratios) + pad
-y_min = min(all_momenta) - pad
-y_max = max(all_momenta) + pad
+data_x_min = min(all_ratios) - pad
+data_x_max = max(all_ratios) + pad
+data_y_min = min(all_momenta) - pad
+data_y_max = max(all_momenta) + pad
+
+# Merge fixed window with data extremes, then enforce square (equal span)
+x_min = min(FIXED_LO, data_x_min)
+x_max = max(FIXED_HI, data_x_max)
+y_min = min(FIXED_LO, data_y_min)
+y_max = max(FIXED_HI, data_y_max)
+
+x_span = x_max - x_min
+y_span = y_max - y_min
+if x_span > y_span:
+    diff = (x_span - y_span) / 2
+    y_min -= diff
+    y_max += diff
+elif y_span > x_span:
+    diff = (y_span - x_span) / 2
+    x_min -= diff
+    x_max += diff
 
 # Quadrant background rectangles
 fig.add_shape(type="rect", x0=100, x1=x_max + 10, y0=100, y1=y_max + 10,
@@ -516,8 +547,8 @@ chart_height = 400 if compact_mode else 600
 fig.update_layout(
     xaxis_title="RS-Ratio",
     yaxis_title="RS-Momentum",
-    xaxis=dict(range=[x_min, x_max], zeroline=False),
-    yaxis=dict(range=[y_min, y_max], zeroline=False),
+    xaxis=dict(range=[x_min, x_max], zeroline=False, constrain="domain"),
+    yaxis=dict(range=[y_min, y_max], zeroline=False, scaleanchor="x", scaleratio=1),
     height=chart_height,
     margin=dict(l=40, r=40, t=20, b=80),
     legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5),
@@ -525,6 +556,12 @@ fig.update_layout(
 )
 
 st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+st.caption(
+    "*RS-Ratio* measures the trend of relative strength vs. the benchmark "
+    "(>100 = outperforming). *RS-Momentum* measures the rate of change of "
+    "that trend (>100 = accelerating)."
+)
 
 # ---------------------------------------------------------------------------
 # Velocity Sort Table
