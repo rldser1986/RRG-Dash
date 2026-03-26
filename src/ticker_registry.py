@@ -15,11 +15,19 @@ Supabase table schema:
 """
 
 import logging
+import re
 from typing import Optional
 
 import streamlit as st
 
 logger = logging.getLogger(__name__)
+
+# Symbols must be 1-12 chars, uppercase alphanumeric plus . ^ = -
+# (covers tickers like BRK.B, ^GSPC, SPY)
+_SYMBOL_RE = re.compile(r"^[A-Z0-9.\^=\-]{1,12}$")
+
+# Maximum unknown symbols to validate per call (rate limit — Finding #4)
+MAX_UNKNOWN_VALIDATIONS = 8
 
 
 # ── Supabase clients ────────────────────────────────────────────────────────
@@ -100,6 +108,12 @@ def _fallback_csv() -> list[dict]:
     ]
 
 
+def _sanitize_text(value: str, max_length: int = 100) -> str:
+    """Strip HTML tags and limit length (defense against stored XSS — Finding #3)."""
+    value = re.sub(r"<[^>]+>", "", value)
+    return value.strip()[:max_length]
+
+
 def get_ticker_options() -> list[str]:
     """Return formatted options for the multiselect: 'TICKER — Company'."""
     tickers = load_all_tickers()
@@ -139,6 +153,11 @@ def validate_and_register(symbol: str) -> Optional[dict]:
     if not symbol:
         return None
 
+    # Reject obviously invalid symbols before hitting yfinance (Finding #11)
+    if not _SYMBOL_RE.match(symbol):
+        logger.debug("Rejected invalid symbol format: %s", symbol)
+        return None
+
     # First check if it's already in the registry (avoid duplicate API calls)
     client = _get_client()
     if client is not None:
@@ -166,8 +185,10 @@ def validate_and_register(symbol: str) -> Optional[dict]:
         if not name and not info.get("marketCap"):
             return None
 
-        sector = info.get("sector", "")
-        industry = info.get("industry", "")
+        # Sanitize all text fields from yfinance (Finding #3 — stored XSS defense)
+        name = _sanitize_text(name)
+        sector = _sanitize_text(info.get("sector", ""))
+        industry = _sanitize_text(info.get("industry", ""))
 
         ticker_data = {
             "symbol": symbol,
@@ -198,18 +219,28 @@ def validate_symbols(symbols: list[str]) -> tuple[list[str], list[str]]:
 
     Returns (valid_symbols, invalid_symbols).
     Valid symbols are also registered in Supabase if they were unknown.
+    Caps the number of yfinance lookups per call (Finding #4).
     """
     all_tickers = {t["symbol"] for t in load_all_tickers()}
     valid = []
     invalid = []
+    yf_lookups = 0
 
     for sym in symbols:
         sym = sym.strip().upper()
         if not sym:
             continue
+        # Pre-filter with regex
+        if not _SYMBOL_RE.match(sym):
+            invalid.append(sym)
+            continue
         if sym in all_tickers:
             valid.append(sym)
         else:
+            if yf_lookups >= MAX_UNKNOWN_VALIDATIONS:
+                invalid.append(sym)
+                continue
+            yf_lookups += 1
             result = validate_and_register(sym)
             if result:
                 valid.append(sym)

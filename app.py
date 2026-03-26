@@ -2,6 +2,7 @@
 
 import math
 from datetime import datetime
+from html import escape as html_escape
 
 import streamlit as st
 import plotly.graph_objects as go
@@ -9,7 +10,9 @@ import pandas as pd
 from streamlit_autorefresh import st_autorefresh
 
 from src.engine import run as engine_run
-from src.db import save_results, get_latest, get_by_date, get_tail, get_available_dates
+from src.db import (
+    save_results, get_latest, get_by_date, get_tails_batch, get_available_dates,
+)
 from src.watchlists import (
     get_supabase_client, list_watchlists, save_watchlist,
     delete_watchlist, get_next_default_name,
@@ -243,10 +246,13 @@ else:  # Individual
         benchmark = "SPY"
     tickers = [t for t in tickers if t != benchmark]
 
+    # ── Fetch watchlists once (reused for default name + display) ────────
+    _watchlists = list_watchlists() if get_supabase_client() is not None else []
+
     # ── Section 1: Save Current Watchlist ─────────────────────────────────
     st.sidebar.markdown("---")
     st.sidebar.markdown("**Save Current Watchlist**")
-    _default_wl_name = get_next_default_name()
+    _default_wl_name = get_next_default_name(_watchlists)
     wl_name = st.sidebar.text_input(
         "Watchlist name", value=_default_wl_name, key="wl_name_input",
         max_chars=50,
@@ -276,7 +282,6 @@ else:  # Individual
     if get_supabase_client() is None:
         st.sidebar.info("Watchlist history unavailable")
     else:
-        _watchlists = list_watchlists()
         if not _watchlists:
             st.sidebar.caption("No saved watchlists yet.")
         else:
@@ -342,7 +347,7 @@ if "_invalid_tickers" in st.session_state:
     st.toast(f"Invalid tickers skipped: {', '.join(_inv)}", icon="\u26a0\ufe0f")
 
 if st.sidebar.button("Refresh Data"):
-    st.cache_data.clear()
+    fetch_and_store.clear()  # Only clear RRG pipeline cache, not ticker registry
     st.session_state["last_refresh"] = datetime.now()
     st.session_state["_show_refresh_toast"] = True
     st.rerun()
@@ -353,7 +358,7 @@ if auto_refresh:
     tick = st_autorefresh(interval=AUTOREFRESH_INTERVAL_MS, key="rrg_autorefresh")
     # tick > 0 means an auto-refresh just fired (not the initial page load)
     if tick > 0:
-        st.cache_data.clear()
+        fetch_and_store.clear()
         st.session_state["last_refresh"] = datetime.now()
 
 if not tickers:
@@ -426,12 +431,11 @@ if compact_mode:
 # ---------------------------------------------------------------------------
 # Precompute tails (used by both chart and velocity table)
 # ---------------------------------------------------------------------------
-tails: dict[str, pd.DataFrame] = {}
 # In lookback mode, tails must end at the selected date (not the latest)
 _tail_cutoff = selected_date if use_lookback else None
-for _, row in snapshot.iterrows():
-    tails[row["ticker"]] = get_tail(row["ticker"], benchmark, tail_weeks,
-                                     up_to_date=_tail_cutoff)
+tails = get_tails_batch(
+    list(snapshot["ticker"]), benchmark, tail_weeks, up_to_date=_tail_cutoff,
+)
 
 # ---------------------------------------------------------------------------
 # Hero Plot
@@ -463,7 +467,7 @@ _card_cols = st.columns(4)
 for _i, (_q_name, _q_emoji, _q_color) in enumerate(_quad_info):
     with _card_cols[_i]:
         _tickers = _quad_tickers.get(_q_name, [])
-        _ticker_str = ", ".join(sorted(_tickers)) if _tickers else "—"
+        _ticker_str = html_escape(", ".join(sorted(_tickers))) if _tickers else "—"
         st.markdown(
             f"<div style='text-align:center;padding:4px 0;line-height:1.4;'>"
             f"<span style='font-size:0.8rem;color:gray;'>{_q_emoji} {_q_name}</span><br>"
