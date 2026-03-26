@@ -6,13 +6,18 @@ import pandas as pd
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "rrg.db")
 
+_schema_initialized = False
+
 
 def _get_conn() -> sqlite3.Connection:
     """Get a connection to the SQLite database, creating it if needed."""
+    global _schema_initialized
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA journal_mode=WAL")
-    _init_schema(conn)
+    if not _schema_initialized:
+        _init_schema(conn)
+        _schema_initialized = True
     return conn
 
 
