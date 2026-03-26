@@ -563,8 +563,8 @@ chart_height = 400 if compact_mode else 600
 fig.update_layout(
     xaxis_title="RS-Ratio",
     yaxis_title="RS-Momentum",
-    xaxis=dict(range=[x_min, x_max], zeroline=False, constrain="domain"),
-    yaxis=dict(range=[y_min, y_max], zeroline=False, scaleanchor="x", scaleratio=1),
+    xaxis=dict(range=[x_min, x_max], zeroline=False),
+    yaxis=dict(range=[y_min, y_max], zeroline=False),
     height=chart_height,
     margin=dict(l=40, r=40, t=20, b=40),
     showlegend=False,
