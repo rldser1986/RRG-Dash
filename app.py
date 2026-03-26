@@ -61,6 +61,19 @@ INDIVIDUAL_BENCHMARK_OPTIONS = (
     + ["XLK", "XLV", "XLF", "XLE", "XLI", "XLY", "XLP", "XLU", "XLC", "XLRE", "XLB"]
 )
 
+PRESETS = {
+    "AI Infra": ["NVDA", "AVGO", "MRVL", "AMD", "ANET", "VRT", "CRDO", "DELL"],
+    "AI Software": ["MSFT", "GOOGL", "META", "CRM", "NOW", "PLTR", "SNOW", "ADBE"],
+    "Semis": ["NVDA", "AMD", "INTC", "AVGO", "QCOM", "TXN", "MU", "MRVL"],
+    "Financials": ["JPM", "BAC", "GS", "MS", "WFC", "C", "BLK", "SCHW"],
+    "Defense": ["LMT", "RTX", "NOC", "GD", "LHX", "HII", "TDG", "HWM"],
+    "Reshoring": ["CAT", "VMC", "MLM", "URI", "PWR", "EME", "FAST", "GWW"],
+    "Cyber": ["PANW", "CRWD", "FTNT", "ZS", "S", "CYBR", "OKTA", "NET"],
+    "Healthcare": ["LLY", "NVO", "AMGN", "VRTX", "ABBV", "UNH", "MRK", "REGN"],
+    "Gold": ["NEM", "AEM", "GOLD", "WPM", "FNV", "RGLD", "FCX", "SCCO"],
+    "REITs": ["PLD", "AMT", "EQIX", "DLR", "O", "SPG", "PSA", "WELL"],
+}
+
 QUADRANT_COLORS = {
     "Leading": "#00C853",
     "Weakening": "#FF9100",
@@ -160,6 +173,27 @@ else:  # Individual
         # Pre-set benchmark (before widget renders, so selectbox picks it up)
         if _wl_bench in INDIVIDUAL_BENCHMARK_OPTIONS:
             st.session_state["bench_individual"] = _wl_bench
+
+    # Merge pending preset load (from Quick Picks buttons)
+    if "_pending_preset" in st.session_state:
+        _preset_syms = st.session_state.pop("_pending_preset")
+        if ticker_options:
+            _sym_to_opt = {opt.split(" — ")[0]: opt for opt in ticker_options}
+            st.session_state["individual_tickers"] = [
+                _sym_to_opt[s] for s in _preset_syms if s in _sym_to_opt
+            ]
+        else:
+            st.session_state["individual_tickers"] = _preset_syms
+
+    # ── Quick Picks (preset watchlists) ───────────────────────────────────
+    st.sidebar.caption("Quick picks")
+    _preset_names = list(PRESETS.keys())
+    _qp_cols = st.sidebar.columns(2)
+    for _i, _name in enumerate(_preset_names):
+        with _qp_cols[_i % 2]:
+            if st.button(_name, key=f"preset_{_name}", use_container_width=True):
+                st.session_state["_pending_preset"] = PRESETS[_name]
+                st.rerun()
 
     if ticker_options:
         selected = st.sidebar.multiselect(
