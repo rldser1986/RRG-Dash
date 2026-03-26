@@ -649,3 +649,23 @@ with tab_rankings:
         hide_index=True,
         column_config=column_config,
     )
+
+    # Download CSV
+    _csv_df = pd.DataFrame({
+        "Ticker": vtable["Ticker"],
+        "RS-Ratio": vtable["RS-Ratio"],
+        "RS-Momentum": vtable["RS-Momentum"],
+        "Quadrant": vtable["Quadrant"],
+        "Velocity": vtable["Velocity"].round(3),
+        "Direction": vtable["toward"].map(
+            {True: "Toward Leading", False: "Away from Leading"}
+        ),
+    })
+    _view_slug = view.lower().replace(" ", "_")
+    _csv_filename = f"rrg_{_view_slug}_{selected_date}.csv"
+    st.download_button(
+        label="Download CSV",
+        data=_csv_df.to_csv(index=False),
+        file_name=_csv_filename,
+        mime="text/csv",
+    )
