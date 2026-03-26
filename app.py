@@ -1,7 +1,6 @@
 """RRG Dashboard — Streamlit entry point."""
 
 import math
-import os
 from datetime import datetime
 
 import streamlit as st
@@ -14,6 +13,9 @@ from src.db import save_results, get_latest, get_by_date, get_tail, get_availabl
 from src.watchlists import (
     get_supabase_client, list_watchlists, save_watchlist,
     delete_watchlist, get_next_default_name,
+)
+from src.ticker_registry import (
+    get_ticker_options, get_ticker_df, validate_symbols, validate_and_register,
 )
 
 AUTOREFRESH_INTERVAL_MS = 60 * 60 * 1000  # 60 minutes
@@ -99,24 +101,14 @@ def fetch_and_store(tickers: tuple, benchmark: str) -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-SP500_CSV = os.path.join(os.path.dirname(__file__), "data", "sp500_tickers.csv")
-
-
-@st.cache_data
 def load_ticker_csv() -> pd.DataFrame:
-    """Load sp500_tickers.csv into a DataFrame. Returns empty DF if missing."""
-    if not os.path.exists(SP500_CSV):
-        return pd.DataFrame()
-    return pd.read_csv(SP500_CSV)
+    """Load ticker data from Supabase registry (with CSV fallback)."""
+    return get_ticker_df()
 
 
-@st.cache_data
 def load_ticker_options() -> list[str]:
     """Return formatted options: 'TICKER — Company'."""
-    df = load_ticker_csv()
-    if df.empty:
-        return []
-    return [f"{row.Symbol} — {row.Company}" for _, row in df.iterrows()]
+    return get_ticker_options()
 
 # ---------------------------------------------------------------------------
 # Sidebar
@@ -165,9 +157,17 @@ else:  # Individual
         _wl_bench = st.session_state.pop("_pending_wl_benchmark", "SPY")
         if ticker_options:
             _sym_to_opt = {opt.split(" — ")[0]: opt for opt in ticker_options}
-            st.session_state["individual_tickers"] = [
-                _sym_to_opt[s] for s in _wl_syms if s in _sym_to_opt
-            ]
+            _known = [_sym_to_opt[s] for s in _wl_syms if s in _sym_to_opt]
+            _unknown = [s for s in _wl_syms if s not in _sym_to_opt]
+            if _unknown:
+                _valid, _invalid = validate_symbols(_unknown)
+                if _invalid:
+                    st.session_state["_invalid_tickers"] = _invalid
+                if _valid:
+                    ticker_options = load_ticker_options()
+                    _sym_to_opt = {opt.split(" — ")[0]: opt for opt in ticker_options}
+                    _known += [_sym_to_opt[s] for s in _valid if s in _sym_to_opt]
+            st.session_state["individual_tickers"] = _known
         else:
             st.session_state["individual_tickers"] = _wl_syms
         # Pre-set benchmark (before widget renders, so selectbox picks it up)
@@ -179,9 +179,19 @@ else:  # Individual
         _preset_syms = st.session_state.pop("_pending_preset")
         if ticker_options:
             _sym_to_opt = {opt.split(" — ")[0]: opt for opt in ticker_options}
-            st.session_state["individual_tickers"] = [
-                _sym_to_opt[s] for s in _preset_syms if s in _sym_to_opt
-            ]
+            _known = [_sym_to_opt[s] for s in _preset_syms if s in _sym_to_opt]
+            _unknown = [s for s in _preset_syms if s not in _sym_to_opt]
+            # Validate & register unknown tickers via yfinance
+            if _unknown:
+                _valid, _invalid = validate_symbols(_unknown)
+                if _invalid:
+                    st.session_state["_invalid_tickers"] = _invalid
+                # Reload options now that new tickers were registered
+                if _valid:
+                    ticker_options = load_ticker_options()
+                    _sym_to_opt = {opt.split(" — ")[0]: opt for opt in ticker_options}
+                    _known += [_sym_to_opt[s] for s in _valid if s in _sym_to_opt]
+            st.session_state["individual_tickers"] = _known
         else:
             st.session_state["individual_tickers"] = _preset_syms
 
@@ -331,6 +341,11 @@ st.sidebar.markdown("---")
 if st.session_state.get("_show_refresh_toast"):
     st.toast("Data refreshed!", icon="\u2705")
     st.session_state["_show_refresh_toast"] = False
+
+# Show invalid ticker warning from preset/watchlist load
+if "_invalid_tickers" in st.session_state:
+    _inv = st.session_state.pop("_invalid_tickers")
+    st.toast(f"Invalid tickers skipped: {', '.join(_inv)}", icon="\u26a0\ufe0f")
 
 if st.sidebar.button("Refresh Data"):
     st.cache_data.clear()
