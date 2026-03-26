@@ -61,8 +61,23 @@ def list_watchlists() -> list[dict]:
         return []
 
 
+MAX_NAME_LENGTH = 50
+
+
+def _sanitize_name(name: str) -> str | None:
+    """Sanitize a watchlist name. Returns None if invalid after cleaning."""
+    name = re.sub(r"<[^>]+>", "", name)  # strip HTML tags
+    name = name.strip()
+    if not name:
+        return None
+    return name[:MAX_NAME_LENGTH]
+
+
 def save_watchlist(name: str, tickers: list[str], benchmark: str) -> dict | None:
     """Insert a new watchlist row. Enforces a FIFO cap of 20 rows."""
+    name = _sanitize_name(name)
+    if name is None:
+        return None
     client = get_supabase_client()
     if client is None:
         return None

@@ -160,7 +160,8 @@ else:  # Individual
             _known = [_sym_to_opt[s] for s in _wl_syms if s in _sym_to_opt]
             _unknown = [s for s in _wl_syms if s not in _sym_to_opt]
             if _unknown:
-                _valid, _invalid = validate_symbols(_unknown)
+                with st.spinner("Validating new tickers…"):
+                    _valid, _invalid = validate_symbols(_unknown)
                 if _invalid:
                     st.session_state["_invalid_tickers"] = _invalid
                 if _valid:
@@ -183,7 +184,8 @@ else:  # Individual
             _unknown = [s for s in _preset_syms if s not in _sym_to_opt]
             # Validate & register unknown tickers via yfinance
             if _unknown:
-                _valid, _invalid = validate_symbols(_unknown)
+                with st.spinner("Validating new tickers…"):
+                    _valid, _invalid = validate_symbols(_unknown)
                 if _invalid:
                     st.session_state["_invalid_tickers"] = _invalid
                 # Reload options now that new tickers were registered
@@ -256,6 +258,7 @@ else:  # Individual
     _default_wl_name = get_next_default_name()
     wl_name = st.sidebar.text_input(
         "Watchlist name", value=_default_wl_name, key="wl_name_input",
+        max_chars=50,
     )
     if st.sidebar.button("Save", use_container_width=True):
         # Grab raw symbols from current multiselect state
