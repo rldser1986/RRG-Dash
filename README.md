@@ -41,6 +41,19 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+### Secrets (optional)
+
+Watchlists and the ticker registry use Supabase for persistence. Create `.streamlit/secrets.toml` with:
+
+```toml
+[supabase]
+url = "https://YOUR_PROJECT.supabase.co"
+key = "your-anon-key"             # public / anon key (read access)
+service_key = "your-service-key"  # optional — enables ticker registry writes
+```
+
+The app works without Supabase — watchlists will be disabled and the ticker search falls back to the local CSV in `data/sp500_tickers.csv`.
+
 ### Run
 
 ```bash
@@ -55,8 +68,7 @@ The database (`data/rrg.db`) is auto-created on first run.
 2. Go to [share.streamlit.io](https://share.streamlit.io) and connect your GitHub account.
 3. Select the repo, branch `main`, and main file `app.py`.
 4. Click **Deploy**. The app will install dependencies from `requirements.txt` and `packages.txt` automatically.
-
-No secrets or environment variables are required — all data is fetched from Yahoo Finance's public API.
+5. In the app's **Settings → Secrets**, add the `[supabase]` keys listed above.
 
 ## Project Structure
 
@@ -66,6 +78,8 @@ RRG-Dash/
 ├── src/
 │   ├── engine.py          # yfinance data fetch + JdK normalization
 │   ├── db.py              # SQLite wrapper
+│   ├── ticker_registry.py # Supabase-backed ticker lookup + yfinance validation
+│   ├── watchlists.py      # Supabase-backed watchlist persistence
 │   └── main.py            # CLI runner for testing
 ├── data/                  # SQLite database (auto-created, gitignored)
 ├── .streamlit/
