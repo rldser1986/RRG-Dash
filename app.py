@@ -419,17 +419,6 @@ for _, row in snapshot.iterrows():
                                      up_to_date=_tail_cutoff)
 
 # ---------------------------------------------------------------------------
-# Quadrant Summary Cards
-# ---------------------------------------------------------------------------
-_quad_emoji = {"Leading": "🟢", "Weakening": "🟡", "Lagging": "🔴", "Improving": "🔵"}
-_quad_counts = snapshot["quadrant"].value_counts().to_dict()
-_card_cols = st.columns(4)
-for _i, (_q_name, _q_emoji) in enumerate(_quad_emoji.items()):
-    with _card_cols[_i]:
-        _count = _quad_counts.get(_q_name, 0)
-        st.metric(label=f"{_q_emoji} {_q_name}", value=_count)
-
-# ---------------------------------------------------------------------------
 # Hero Plot
 # ---------------------------------------------------------------------------
 if compact_mode:
@@ -442,23 +431,42 @@ if use_lookback:
 else:
     st.caption(f"Latest: {selected_date}  |  Benchmark: {benchmark}")
 
+# ---------------------------------------------------------------------------
+# Quadrant Summary Cards (compact badges below title, above chart)
+# ---------------------------------------------------------------------------
+_quad_info = [
+    ("Leading", "🟢", "#00C853"),
+    ("Weakening", "🟡", "#FF9100"),
+    ("Lagging", "🔴", "#FF1744"),
+    ("Improving", "🔵", "#2979FF"),
+]
+_quad_counts = snapshot["quadrant"].value_counts().to_dict()
+_card_cols = st.columns(4)
+for _i, (_q_name, _q_emoji, _q_color) in enumerate(_quad_info):
+    with _card_cols[_i]:
+        _count = _quad_counts.get(_q_name, 0)
+        st.markdown(
+            f"<div style='text-align:center;padding:4px 0;'>"
+            f"<span style='font-size:0.85rem;color:gray;'>{_q_emoji} {_q_name}</span><br>"
+            f"<span style='font-size:1.4rem;font-weight:700;color:{_q_color};'>{_count}</span>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
 fig = go.Figure()
 
 # Determine axis range — fixed default 96-104, expand symmetrically for outliers
 # and keep quadrants square (equal x and y span).
+# NOTE: Only current-point positions drive range expansion. Tails that extend
+# beyond the window are simply clipped by Plotly — this prevents a single
+# long tail from blowing out the axis range asymmetrically.
 FIXED_LO, FIXED_HI = 96.0, 104.0
 
-all_ratios = snapshot["rs_ratio"].tolist()
-all_momenta = snapshot["rs_momentum"].tolist()
-for tail in tails.values():
-    all_ratios.extend(tail["rs_ratio"].tolist())
-    all_momenta.extend(tail["rs_momentum"].tolist())
-
 pad = 0.5
-data_x_min = min(all_ratios) - pad
-data_x_max = max(all_ratios) + pad
-data_y_min = min(all_momenta) - pad
-data_y_max = max(all_momenta) + pad
+data_x_min = snapshot["rs_ratio"].min() - pad
+data_x_max = snapshot["rs_ratio"].max() + pad
+data_y_min = snapshot["rs_momentum"].min() - pad
+data_y_max = snapshot["rs_momentum"].max() + pad
 
 # Merge fixed window with data extremes, then enforce square (equal span)
 x_min = min(FIXED_LO, data_x_min)
