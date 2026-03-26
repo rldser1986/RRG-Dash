@@ -432,7 +432,7 @@ else:
     st.caption(f"Latest: {selected_date}  |  Benchmark: {benchmark}")
 
 # ---------------------------------------------------------------------------
-# Quadrant Summary Cards (compact badges below title, above chart)
+# Quadrant Summary / Legend (compact badges with ticker lists)
 # ---------------------------------------------------------------------------
 _quad_info = [
     ("Leading", "🟢", "#00C853"),
@@ -440,18 +440,24 @@ _quad_info = [
     ("Lagging", "🔴", "#FF1744"),
     ("Improving", "🔵", "#2979FF"),
 ]
-_quad_counts = snapshot["quadrant"].value_counts().to_dict()
+_quad_tickers: dict[str, list[str]] = {}
+for _, _row in snapshot.iterrows():
+    _quad_tickers.setdefault(_row["quadrant"], []).append(_row["ticker"])
+
 _card_cols = st.columns(4)
 for _i, (_q_name, _q_emoji, _q_color) in enumerate(_quad_info):
     with _card_cols[_i]:
-        _count = _quad_counts.get(_q_name, 0)
+        _tickers = _quad_tickers.get(_q_name, [])
+        _ticker_str = ", ".join(sorted(_tickers)) if _tickers else "—"
         st.markdown(
-            f"<div style='text-align:center;padding:4px 0;'>"
-            f"<span style='font-size:0.85rem;color:gray;'>{_q_emoji} {_q_name}</span><br>"
-            f"<span style='font-size:1.4rem;font-weight:700;color:{_q_color};'>{_count}</span>"
+            f"<div style='text-align:center;padding:4px 0;line-height:1.4;'>"
+            f"<span style='font-size:0.8rem;color:gray;'>{_q_emoji} {_q_name}</span><br>"
+            f"<span style='font-size:0.85rem;color:{_q_color};'>{_ticker_str}</span>"
             f"</div>",
             unsafe_allow_html=True,
         )
+
+tab_chart, tab_rankings = st.tabs(["Chart", "Rankings"])
 
 fig = go.Figure()
 
@@ -499,12 +505,13 @@ fig.add_shape(type="rect", x0=x_min - 10, x1=100, y0=100, y1=y_max + 10,
 fig.add_hline(y=100, line_dash="dot", line_color="gray", line_width=1)
 fig.add_vline(x=100, line_dash="dot", line_color="gray", line_width=1)
 
-# Quadrant labels
-label_style = dict(font=dict(size=11, color="rgba(150,150,150,0.5)"), showarrow=False)
-fig.add_annotation(x=x_max, y=y_max, text="Leading", xanchor="right", yanchor="top", **label_style)
-fig.add_annotation(x=x_max, y=y_min, text="Weakening", xanchor="right", yanchor="bottom", **label_style)
-fig.add_annotation(x=x_min, y=y_min, text="Lagging", xanchor="left", yanchor="bottom", **label_style)
-fig.add_annotation(x=x_min, y=y_max, text="Improving", xanchor="left", yanchor="top", **label_style)
+# Quadrant labels — pinned to paper (plot-area) corners so they stay put on resize
+_lbl = dict(font=dict(size=11, color="rgba(150,150,150,0.5)"), showarrow=False,
+            xref="paper", yref="paper")
+fig.add_annotation(x=1, y=1, text="Leading", xanchor="right", yanchor="top", **_lbl)
+fig.add_annotation(x=1, y=0, text="Weakening", xanchor="right", yanchor="bottom", **_lbl)
+fig.add_annotation(x=0, y=0, text="Lagging", xanchor="left", yanchor="bottom", **_lbl)
+fig.add_annotation(x=0, y=1, text="Improving", xanchor="left", yanchor="top", **_lbl)
 
 # Tails + current points
 for _, row in snapshot.iterrows():
@@ -541,6 +548,7 @@ for _, row in snapshot.iterrows():
         text=[ticker],
         textposition="top center",
         textfont=dict(size=font_size, color=color),
+        showlegend=False,
         name=f"{ticker} ({quadrant})",
         hovertemplate=(
             f"<b>{ticker}</b><br>"
@@ -558,26 +566,22 @@ fig.update_layout(
     xaxis=dict(range=[x_min, x_max], zeroline=False, constrain="domain"),
     yaxis=dict(range=[y_min, y_max], zeroline=False, scaleanchor="x", scaleratio=1),
     height=chart_height,
-    margin=dict(l=40, r=40, t=20, b=80),
-    legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5),
+    margin=dict(l=40, r=40, t=20, b=40),
+    showlegend=False,
     plot_bgcolor="rgba(0,0,0,0)",
 )
 
-st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-
-st.caption(
-    "*RS-Ratio* measures the trend of relative strength vs. the benchmark "
-    "(>100 = outperforming). *RS-Momentum* measures the rate of change of "
-    "that trend (>100 = accelerating)."
-)
+with tab_chart:
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    st.caption(
+        "*RS-Ratio* measures the trend of relative strength vs. the benchmark "
+        "(>100 = outperforming). *RS-Momentum* measures the rate of change of "
+        "that trend (>100 = accelerating)."
+    )
 
 # ---------------------------------------------------------------------------
-# Velocity Sort Table
+# Velocity Sort Table (inside Rankings tab)
 # ---------------------------------------------------------------------------
-if compact_mode:
-    st.markdown("### Velocity Rankings")
-else:
-    st.subheader("Velocity Rankings")
 
 velocity_rows = []
 for _, row in snapshot.iterrows():
@@ -638,9 +642,10 @@ column_config = {
 if not compact_mode:
     column_config["Velocity"] = st.column_config.NumberColumn("Velocity", format="%.3f")
 
-st.dataframe(
-    vtable_display,
-    use_container_width=True,
-    hide_index=True,
-    column_config=column_config,
-)
+with tab_rankings:
+    st.dataframe(
+        vtable_display,
+        use_container_width=True,
+        hide_index=True,
+        column_config=column_config,
+    )
