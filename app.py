@@ -315,6 +315,12 @@ else:  # Individual
 st.sidebar.markdown("---")
 compact_mode = st.sidebar.checkbox("Compact Mode", value=False)
 tail_weeks = st.sidebar.slider("Tail Length (weeks)", min_value=3, max_value=10, value=3)
+highlight_tickers = st.sidebar.multiselect(
+    "Highlight tickers",
+    options=sorted(tickers),
+    default=[],
+    help="Dim all other tickers to focus on selected ones",
+)
 
 # ---------------------------------------------------------------------------
 # Refresh Data button + Auto-Refresh
@@ -514,11 +520,15 @@ fig.add_annotation(x=0, y=0, text="Lagging", xanchor="left", yanchor="bottom", *
 fig.add_annotation(x=0, y=1, text="Improving", xanchor="left", yanchor="top", **_lbl)
 
 # Tails + current points
+_has_highlight = len(highlight_tickers) > 0
+_DIM_OPACITY = 0.1
+
 for _, row in snapshot.iterrows():
     ticker = row["ticker"]
     quadrant = row["quadrant"]
     color = QUADRANT_COLORS.get(quadrant, "gray")
     tail = tails[ticker]
+    _dimmed = _has_highlight and ticker not in highlight_tickers
 
     if len(tail) > 1:
         n_segments = len(tail) - 1
@@ -528,11 +538,13 @@ for _, row in snapshot.iterrows():
                 seg_opacity = 1.0
             else:
                 seg_opacity = 0.15 + 0.85 * (seg_i / (n_segments - 1))
+            if _dimmed:
+                seg_opacity = min(seg_opacity, _DIM_OPACITY)
             fig.add_trace(go.Scatter(
                 x=tail["rs_ratio"].iloc[seg_i:seg_i + 2],
                 y=tail["rs_momentum"].iloc[seg_i:seg_i + 2],
                 mode="lines",
-                line=dict(color=color, width=1.5),
+                line=dict(color="gray" if _dimmed else color, width=1.5),
                 opacity=seg_opacity,
                 showlegend=False,
                 hoverinfo="skip",
@@ -540,15 +552,19 @@ for _, row in snapshot.iterrows():
 
     marker_size = 8 if compact_mode else 10
     font_size = 10 if compact_mode else 11
+    _marker_opacity = _DIM_OPACITY if _dimmed else 1.0
+    _display_color = "gray" if _dimmed else color
 
     fig.add_trace(go.Scatter(
         x=[row["rs_ratio"]], y=[row["rs_momentum"]],
         mode="markers+text",
-        marker=dict(size=marker_size, color=color, line=dict(width=1, color="white")),
+        marker=dict(size=marker_size, color=_display_color,
+                    line=dict(width=1, color="white"), opacity=_marker_opacity),
         text=[ticker],
         textposition="top center",
-        textfont=dict(size=font_size, color=color),
+        textfont=dict(size=font_size, color=_display_color),
         showlegend=False,
+        opacity=_marker_opacity,
         name=f"{ticker} ({quadrant})",
         hovertemplate=(
             f"<b>{ticker}</b><br>"
