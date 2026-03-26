@@ -1,9 +1,13 @@
 """RRG Engine — yfinance data fetch + JdK-style normalization."""
 
+import logging
+from datetime import datetime, timedelta
+
 import pandas as pd
 import numpy as np
 import yfinance as yf
-from datetime import datetime, timedelta
+
+logger = logging.getLogger(__name__)
 
 
 SCALING_FACTOR = 1.5
@@ -56,14 +60,14 @@ def compute_rrg(prices: pd.DataFrame, tickers: list[str],
 
     for ticker in tickers:
         if ticker not in prices.columns:
-            print(f"  [WARN] {ticker} not found in price data, skipping")
+            logger.warning("%s not found in price data, skipping", ticker)
             continue
         if ticker == benchmark:
             continue
 
         pair = prices[[ticker, benchmark]].dropna()
         if len(pair) < RS_WINDOW + MOMENTUM_WINDOW:
-            print(f"  [WARN] {ticker} has insufficient data ({len(pair)} rows), skipping")
+            logger.warning("%s has insufficient data (%d rows), skipping", ticker, len(pair))
             continue
 
         # Step 1: Relative Strength
@@ -117,9 +121,9 @@ def _assign_quadrant(row: pd.Series) -> str:
 def run(tickers: list[str], benchmark: str = "SPY",
         scaling_factor: float = SCALING_FACTOR) -> pd.DataFrame:
     """Full pipeline: fetch prices → compute RRG → return DataFrame."""
-    print(f"Fetching prices for {tickers} vs {benchmark}...")
+    logger.info("Fetching prices for %s vs %s", tickers, benchmark)
     prices = fetch_prices(tickers, benchmark)
-    print(f"  Got {len(prices)} weekly rows, computing RRG...")
+    logger.info("Got %d weekly rows, computing RRG", len(prices))
     df = compute_rrg(prices, tickers, benchmark, scaling_factor)
-    print(f"  Computed {len(df)} RRG data points")
+    logger.info("Computed %d RRG data points", len(df))
     return df
